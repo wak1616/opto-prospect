@@ -9,14 +9,46 @@ type PlaceResultLite = {
   vicinity?: string;
   formatted_address?: string;
   geometry?: google.maps.places.PlaceResult['geometry'];
+  rating?: number;
+  user_ratings_total?: number;
 };
 
 const RADIUS_METERS = 4828.03; // ~3 miles
 
+// Helper function to render star rating
+const renderStarRating = (rating?: number, totalReviews?: number) => {
+  if (!rating) return null;
+  
+  const fullStars = Math.floor(rating);
+  const hasHalfStar = rating % 1 >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+  
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      <div className="flex">
+        {/* Full stars */}
+        {Array(fullStars).fill(0).map((_, i) => (
+          <span key={`full-${i}`} className="text-yellow-400">★</span>
+        ))}
+        {/* Half star */}
+        {hasHalfStar && <span className="text-yellow-400">☆</span>}
+        {/* Empty stars */}
+        {Array(emptyStars).fill(0).map((_, i) => (
+          <span key={`empty-${i}`} className="text-gray-300">☆</span>
+        ))}
+      </div>
+      <span className="text-gray-600">
+        {rating.toFixed(1)} {totalReviews ? `(${totalReviews})` : ''}
+      </span>
+    </div>
+  );
+};
+
 export default function Map() {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<{ [key: string]: google.maps.Marker }>({});
+  const activeInfoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [loader] = useState(
     () =>
       new Loader({
@@ -29,6 +61,7 @@ export default function Map() {
   const [center, setCenter] = useState<google.maps.LatLngLiteral | null>(null);
   const [places, setPlaces] = useState<PlaceResultLite[]>([]);
   const [zip, setZip] = useState('');
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
 
   // Initialize map
   useEffect(() => {
@@ -91,9 +124,14 @@ export default function Map() {
     const map = mapInstance.current;
     if (!map) return;
 
-    // Clear old markers
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
+    // Clear old markers and info windows
+    if (activeInfoWindowRef.current) {
+      activeInfoWindowRef.current.close();
+      activeInfoWindowRef.current = null;
+    }
+    Object.values(markersRef.current).forEach((marker) => marker.setMap(null));
+    markersRef.current = {};
+    setSelectedPlaceId(null);
 
     const service = new google.maps.places.PlacesService(map);
     
@@ -127,6 +165,8 @@ export default function Map() {
                 vicinity: r.vicinity,
                 formatted_address: r.formatted_address,
                 geometry: r.geometry,
+                rating: r.rating,
+                user_ratings_total: r.user_ratings_total,
               });
             }
           } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
@@ -172,14 +212,39 @@ export default function Map() {
         position: p.geometry.location,
         map,
         title: p.name,
+        icon: {
+          url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+        },
       });
       const iw = new google.maps.InfoWindow({
         content: `<div style="font-size:14px;"><b>${p.name}</b><br/>${p.vicinity || p.formatted_address || ''}<br/><button id="save-${p.place_id}" style="margin-top:6px;">Save</button></div>`,
       });
       marker.addListener('click', () => {
+        console.log('Marker clicked:', p.place_id, 'Current selected:', selectedPlaceId);
+        
+        // Close any open info window
+        if (activeInfoWindowRef.current) {
+          activeInfoWindowRef.current.close();
+        }
+        
+        // Reset ALL markers to red first
+        Object.values(markersRef.current).forEach((m) => {
+          m.setIcon({
+            url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+          });
+        });
+        
+        // Set current selection
+        setSelectedPlaceId(p.place_id);
+        marker.setIcon({
+          url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
+        });
+        
+        // Open new info window and track it
         iw.open({ map, anchor: marker });
+        activeInfoWindowRef.current = iw;
       });
-      markersRef.current.push(marker);
+      markersRef.current[p.place_id] = marker;
     });
   };
 
@@ -243,14 +308,33 @@ export default function Map() {
         {places.length === 0 && <div className="text-sm text-gray-600">No results yet.</div>}
         <ul className="space-y-2">
           {places.map((p) => (
-            <li key={p.place_id} className="border rounded-lg p-2">
+            <li key={p.place_id} className={`border rounded-lg p-2 ${selectedPlaceId === p.place_id ? 'border-green-500 bg-green-50' : ''}`}>
               <div className="text-sm font-medium">{p.name}</div>
               <div className="text-xs text-gray-600">{p.vicinity || p.formatted_address}</div>
+              {renderStarRating(p.rating, p.user_ratings_total)}
               <div className="mt-2 flex gap-2">
                 <button
                   className="text-xs border rounded px-2 py-1"
                   onClick={() => {
                     if (p.geometry?.location && mapInstance.current) {
+                      console.log('View on map clicked:', p.place_id);
+                      
+                      // Reset ALL markers to red first
+                      Object.values(markersRef.current).forEach((m) => {
+                        m.setIcon({
+                          url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+                        });
+                      });
+                      
+                      // Set current selection
+                      setSelectedPlaceId(p.place_id);
+                      const currentMarker = markersRef.current[p.place_id];
+                      if (currentMarker) {
+                        currentMarker.setIcon({
+                          url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
+                        });
+                      }
+                      
                       mapInstance.current.panTo(p.geometry.location);
                     }
                   }}
