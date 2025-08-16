@@ -252,7 +252,6 @@ export default function Map() {
                   onClick={() => {
                     if (p.geometry?.location && mapInstance.current) {
                       mapInstance.current.panTo(p.geometry.location);
-                      mapInstance.current.setZoom(15);
                     }
                   }}
                 >
