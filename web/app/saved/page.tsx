@@ -348,7 +348,7 @@ export default function SavedPage() {
         </div>
       )}
       {items.length === 0 ? (
-        <div className="text-gray-600">Nothing saved yet. Go back to the map and hit "Save".</div>
+        <div className="text-gray-600">Nothing saved yet. Go back to the map and hit &quot;Save&quot;.</div>
       ) : (
         <div className="space-y-6">
           {/* Regular Items */}

@@ -16,6 +16,15 @@ type PlaceResultLite = {
   user_ratings_total?: number;
 };
 
+type TargetPlaceFromSaved = {
+  name: string;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+  rating?: number | null;
+  user_ratings_total?: number | null;
+};
+
 const DEFAULT_RADIUS_MILES = 2;
 const MILES_TO_METERS = 1609.34;
 
@@ -249,7 +258,12 @@ export default function Map() {
 
   // Perform nearby search for both optometrist and eye doctor
   
-  const searchNearby = async (c: google.maps.LatLngLiteral, targetPlaceId?: string, targetPlace?: any, isFromManualClick = false) => {
+  const searchNearby = async (
+    c: google.maps.LatLngLiteral,
+    targetPlaceId?: string,
+    targetPlace?: TargetPlaceFromSaved,
+    isFromManualClick = false
+  ) => {
     process.env.NODE_ENV !== 'production' && console.log('=== searchNearby called with center:', c, 'targetPlaceId:', targetPlaceId, 'isSearching:', isSearching, 'isFromManualClick:', isFromManualClick);
     const currentMap = mapInstance.current;
     if (!currentMap) {
@@ -388,7 +402,7 @@ export default function Map() {
     }
 
     // Remove duplicates based on place_id
-    let uniqueResults = allResults.filter((place, index, self) => 
+    const uniqueResults = allResults.filter((place, index, self) => 
       index === self.findIndex(p => p.place_id === place.place_id)
     );
 

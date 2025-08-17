@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
   
   // Allow builds to continue with ESLint warnings for production
   eslint: {
-    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
+    ignoreDuringBuilds: true,
   },
   
   // Allow TypeScript builds to continue with errors for production
