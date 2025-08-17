@@ -637,7 +637,7 @@ export default function Map() {
               mapInstance.current.setZoom(15);
             }
             // Manually trigger search after centering, including the target place
-            setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace, false), 500); // Allow auto-selection for URL navigation
+            setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace as TargetPlaceFromSaved, false), 500); // Allow auto-selection for URL navigation
           } else if (savedPlace.address && mapInstance.current) {
             // Fallback: geocode the address
             process.env.NODE_ENV !== 'production' && console.log('No coordinates found, geocoding address:', savedPlace.address);
@@ -653,7 +653,7 @@ export default function Map() {
                   mapInstance.current.setZoom(15);
                 }
                 // Manually trigger search after geocoding, including the target place
-                setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace, false), 500); // Allow auto-selection for URL navigation
+                setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace as TargetPlaceFromSaved, false), 500); // Allow auto-selection for URL navigation
               } else {
                 console.error('Geocoding failed:', status);
               }
