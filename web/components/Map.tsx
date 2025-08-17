@@ -73,7 +73,7 @@ export default function Map() {
   // Track selectedPlaceId changes
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' && console.log('selectedPlaceId changed to:', selectedPlaceId);
+      console.log('selectedPlaceId changed to:', selectedPlaceId);
     }
   }, [selectedPlaceId]);
   
@@ -82,7 +82,7 @@ export default function Map() {
   // Track userId changes
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' && console.log('userId changed to:', userId);
+      console.log('userId changed to:', userId);
     }
   }, [userId]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -102,11 +102,11 @@ export default function Map() {
   // Track auth user
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
-      process.env.NODE_ENV !== 'production' && console.log('Setting up auth state listener');
+      console.log('Setting up auth state listener');
     }
     const unsub = auth.onAuthStateChanged((u) => {
       if (process.env.NODE_ENV !== 'production') {
-        process.env.NODE_ENV !== 'production' && console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
+        console.log('Auth state changed:', u ? `User logged in: ${u.uid}` : 'User logged out');
       }
       setUserId(u ? u.uid : null);
     });
