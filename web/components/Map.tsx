@@ -417,8 +417,8 @@ export default function Map() {
         geometry: targetPlace.lat && targetPlace.lng ? {
           location: new google.maps.LatLng(targetPlace.lat, targetPlace.lng)
         } : undefined,
-        rating: targetPlace.rating,
-        user_ratings_total: targetPlace.user_ratings_total,
+        rating: targetPlace.rating ?? undefined,
+        user_ratings_total: targetPlace.user_ratings_total ?? undefined,
       };
       uniqueResults.unshift(targetPlaceResult); // Add at the beginning
     }
