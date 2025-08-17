@@ -183,11 +183,11 @@ export default function Map() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Auto-hide welcome notification after 2 seconds
+  // Auto-hide welcome notification after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowWelcomeNotification(false);
-    }, 2000);
+    }, 3000);
     
     return () => clearTimeout(timer);
   }, []);
@@ -1510,12 +1510,6 @@ export default function Map() {
             <p className="text-base leading-relaxed opacity-95">
               Click anywhere on the map to discover nearby optometrists and eye care practices in that area.
             </p>
-            <button
-              onClick={() => setShowWelcomeNotification(false)}
-              className="mt-4 text-xs text-white/80 hover:text-white underline transition-colors duration-200"
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
