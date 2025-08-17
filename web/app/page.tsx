@@ -1,8 +1,6 @@
 import { Suspense } from 'react';
 import Map from '../components/Map';
 
-export const dynamic = 'force-dynamic';
-
 export default function HomePage() {
   return (
     <main>
