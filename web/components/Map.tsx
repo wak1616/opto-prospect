@@ -25,7 +25,7 @@ type TargetPlaceFromSaved = {
   user_ratings_total?: number | null;
 };
 
-const DEFAULT_RADIUS_MILES = 2;
+const DEFAULT_RADIUS_MILES = 3;
 const MILES_TO_METERS = 1609.34;
 
 // Helper function to render star rating
@@ -115,6 +115,7 @@ export default function Map() {
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedControl, setSelectedControl] = useState<'zip' | 'location' | null>(null);
+  const [showWelcomeNotification, setShowWelcomeNotification] = useState(true);
   const isManualMapClick = useRef(false);
   const searchParams = useSearchParams();
 
@@ -182,6 +183,34 @@ export default function Map() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Auto-hide welcome notification after 2 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowWelcomeNotification(false);
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Hide welcome notification on any click/touch anywhere on screen
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (showWelcomeNotification) {
+        setShowWelcomeNotification(false);
+      }
+    };
+
+    if (showWelcomeNotification) {
+      document.addEventListener('click', handleInteraction);
+      document.addEventListener('touchstart', handleInteraction);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [showWelcomeNotification]);
+
 
   // Initialize map
   useEffect(() => {
@@ -193,7 +222,7 @@ export default function Map() {
       const defaultCenter = { lat: 28.5383, lng: -81.3792 }; // Orlando, FL (East Coast US)
       const map = new google.maps.Map(mapRef.current, {
         center: defaultCenter,
-        zoom: 15,
+        zoom: 13,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
@@ -203,6 +232,7 @@ export default function Map() {
         },
         draggableCursor: 'crosshair',
         draggingCursor: 'url(http://maps.gstatic.com/mapfiles/closedhand_8_8.cur), move',
+        gestureHandling: 'greedy', // Allow 1-finger panning on mobile
       });
       mapInstance.current = map;
 
@@ -702,7 +732,7 @@ export default function Map() {
             setCenter(placeCenter);
             if (mapInstance.current) {
               mapInstance.current.setCenter(placeCenter);
-              mapInstance.current.setZoom(15);
+              mapInstance.current.setZoom(13);
             }
             // Manually trigger search after centering, including the target place
             setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace as TargetPlaceFromSaved, false), 500); // Allow auto-selection for URL navigation
@@ -718,7 +748,7 @@ export default function Map() {
                 setCenter(placeCenter);
                 if (mapInstance.current) {
                   mapInstance.current.setCenter(placeCenter);
-                  mapInstance.current.setZoom(15);
+                  mapInstance.current.setZoom(13);
                 }
                 // Manually trigger search after geocoding, including the target place
                 setTimeout(() => searchNearby(placeCenter, placeIdFromUrl, savedPlace as TargetPlaceFromSaved, false), 500); // Allow auto-selection for URL navigation
@@ -1462,6 +1492,34 @@ export default function Map() {
         </div>
       )}
       
+      {/* Welcome notification */}
+      {showWelcomeNotification && (
+        <div className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-6 rounded-2xl shadow-2xl transition-all duration-500 ease-in-out max-w-sm mx-4 ${
+          showWelcomeNotification ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        }`}>
+          <div className="text-center">
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold mb-3">Welcome! 👋</h3>
+            <p className="text-base leading-relaxed opacity-95">
+              Click anywhere on the map to discover nearby optometrists and eye care practices in that area.
+            </p>
+            <button
+              onClick={() => setShowWelcomeNotification(false)}
+              className="mt-4 text-xs text-white/80 hover:text-white underline transition-colors duration-200"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
