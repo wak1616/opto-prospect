@@ -27,7 +27,7 @@ export default function AuthClientSlot() {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      process.env.NODE_ENV !== 'production' && console.log('AuthClientSlot Mobile detection:', mobile, 'Width:', window.innerWidth); // Debug log
+      console.log('AuthClientSlot Mobile detection:', mobile, 'Width:', window.innerWidth); // Debug log
     };
     
     checkMobile();
@@ -36,7 +36,7 @@ export default function AuthClientSlot() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
-  process.env.NODE_ENV !== 'production' && console.log('AuthClientSlot rendering'); // Debug log
+  console.log('AuthClientSlot rendering'); // Debug log
   
   return (
     <AuthButton />

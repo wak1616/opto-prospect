@@ -17,7 +17,7 @@ export default function NavigationWrapper() {
     const checkMobile = () => {
       const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
-      process.env.NODE_ENV !== 'production' && console.log('Mobile detection:', mobile, 'Width:', window.innerWidth); // Debug log
+      console.log('Mobile detection:', mobile, 'Width:', window.innerWidth); // Debug log
     };
     
     checkMobile();
@@ -36,7 +36,7 @@ export default function NavigationWrapper() {
     );
   }
   
-  process.env.NODE_ENV !== 'production' && console.log('NavigationWrapper rendering:', { isMobile, isSavedPage, mounted }); // Debug log
+  console.log('NavigationWrapper rendering:', { isMobile, isSavedPage, mounted }); // Debug log
   
   return (
     <div 

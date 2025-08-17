@@ -103,8 +103,10 @@ export default function Map() {
   const [isResultsCollapsed, setIsResultsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileControlsCollapsed, setIsMobileControlsCollapsed] = useState(false);
-  // Mobile-only: collapse the lower filters row (radius + search for) by default
-  const [areLowerFiltersCollapsed, setAreLowerFiltersCollapsed] = useState(true);
+  // Responsive: collapse the lower filters row (radius + search for) by default on mobile, expanded on desktop
+  const [areLowerFiltersCollapsed, setAreLowerFiltersCollapsed] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : true
+  );
   const [searchOptometrist, setSearchOptometrist] = useState(true);
   const [searchEyeCareCenter, setSearchEyeCareCenter] = useState(true);
   const [hasUserNavigatedAway, setHasUserNavigatedAway] = useState(false);
@@ -162,10 +164,16 @@ export default function Map() {
     return () => unsub();
   }, [userId]);
 
-  // Detect mobile screen size
+  // Detect mobile screen size and update filter state
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const newIsMobile = window.innerWidth < 768;
+      const isDesktop = window.innerWidth >= 1024;
+      
+      setIsMobile(newIsMobile);
+      
+      // Update filter state based on screen size - expanded on desktop, collapsed on smaller screens
+      setAreLowerFiltersCollapsed(!isDesktop);
     };
     
     checkMobile();
@@ -1032,7 +1040,7 @@ export default function Map() {
 
                 {/* Show filters button - mobile: right-aligned to avoid results panel */}
                 {areLowerFiltersCollapsed && (
-                  <div className="flex justify-end pt-1">
+                  <div className="pt-1 flex justify-end">
                     <button
                       onClick={() => setAreLowerFiltersCollapsed(false)}
                       className="text-xs text-gray-600 hover:text-gray-900 px-2 py-1 rounded"
@@ -1055,7 +1063,7 @@ export default function Map() {
 
       {/* Desktop Controls */}
       {!isMobile && (
-        <div className="absolute top-4 left-4 z-30 bg-white/90 rounded-2xl shadow" style={{ maxWidth: 'min(36rem, calc(100vw - 400px))' }}>
+        <div className="absolute top-4 left-4 z-30 bg-white/90 rounded-2xl shadow" style={{ maxWidth: 'min(36rem, calc(100vw - 360px))' }}>
           <div className="p-3 flex flex-wrap gap-2">
             {/* ZIP Code and Location Row */}
             <div className="flex gap-2 justify-between items-center">
@@ -1124,11 +1132,11 @@ export default function Map() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 bg-gray-50/80 rounded-lg px-3 py-2">
-                  <span className="text-sm text-gray-700 font-medium whitespace-nowrap">
+                <div className="flex items-center gap-3 bg-gray-50/80 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-700 font-medium">
                     Search for:
                   </span>
-                  <div className="flex gap-4">
+                  <div className="flex gap-3">
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input
                         type="checkbox"
@@ -1136,7 +1144,7 @@ export default function Map() {
                         onChange={(e) => setSearchOptometrist(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                       />
-                      <span className="text-sm text-gray-700 whitespace-nowrap">Optometrist</span>
+                      <span className="text-sm text-gray-700">Optometrist</span>
                     </label>
                     <label className="flex items-center gap-1 cursor-pointer">
                       <input
@@ -1145,7 +1153,7 @@ export default function Map() {
                         onChange={(e) => setSearchEyeCareCenter(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                       />
-                      <span className="text-sm text-gray-700 whitespace-nowrap">Eye care center</span>
+                      <span className="text-sm text-gray-700">Eye care center</span>
                     </label>
                   </div>
                 </div>

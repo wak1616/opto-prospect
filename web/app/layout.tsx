@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import AuthClientSlot from './AuthClientSlot';
+import NavButton from '../components/NavButton';
 import NavigationWrapper from '../components/NavigationWrapper';
 import OrientationPrompt from '../components/OrientationPrompt';
 import "./globals.css";
