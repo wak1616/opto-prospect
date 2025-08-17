@@ -2,22 +2,21 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
+// Only validate Firebase env vars in the browser to avoid breaking SSR/static generation
 const required = [
-    'NEXT_PUBLIC_FIREBASE_API_KEY',
-    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-    'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-    'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-    'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-    'NEXT_PUBLIC_FIREBASE_APP_ID',
-  ];
-  for (const k of required) {
-    if (!process.env[k]) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(`[firebase] Missing env var: ${k}`);
-      }
-      throw new Error(`Missing required environment variable: ${k}`);
-    }
+  'NEXT_PUBLIC_FIREBASE_API_KEY',
+  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'NEXT_PUBLIC_FIREBASE_APP_ID',
+];
+if (typeof window !== 'undefined') {
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0 && process.env.NODE_ENV !== 'production') {
+    console.warn(`[firebase] Missing env vars: ${missing.join(', ')}`);
   }
+}
   
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -31,8 +30,12 @@ const firebaseConfig = {
 
 
 
-  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+// Initialize Firebase only in the browser; during SSR/build export harmless placeholders
+let app: ReturnType<typeof initializeApp> | undefined;
+if (typeof window !== 'undefined') {
+  app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+}
 
-export const auth = getAuth(app);
+export const auth = app ? getAuth(app) : (null as unknown as ReturnType<typeof getAuth>);
 export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+export const db = app ? getFirestore(app) : (null as unknown as ReturnType<typeof getFirestore>);
