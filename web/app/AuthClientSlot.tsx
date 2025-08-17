@@ -1,5 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 
 const AuthButton = dynamic(() => import('@/components/AuthButton'), {
   ssr: false,
@@ -19,5 +20,25 @@ const AuthButton = dynamic(() => import('@/components/AuthButton'), {
 });
 
 export default function AuthClientSlot() { 
-  return <AuthButton />; 
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      process.env.NODE_ENV !== 'production' && console.log('AuthClientSlot Mobile detection:', mobile, 'Width:', window.innerWidth); // Debug log
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  process.env.NODE_ENV !== 'production' && console.log('AuthClientSlot rendering'); // Debug log
+  
+  return (
+    <AuthButton />
+  );
 }

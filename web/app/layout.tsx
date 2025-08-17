@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import AuthClientSlot from './AuthClientSlot';
-import NavButton from '../components/NavButton';
+import NavigationWrapper from '../components/NavigationWrapper';
+import OrientationPrompt from '../components/OrientationPrompt';
 import "./globals.css";
+
+// Force dynamic rendering for the entire app due to Firebase/Maps dependencies
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +19,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Opto Prospect",
-  description: "Discover and connect with optometrists and eye care centers in your area. Save your prospects and track your visits efficiently.",
+  title: "Opto Prospect - Find and Track Optometrists",
+  description: "Discover optometrists in your area and track your prospects with our comprehensive mapping and CRM solution.",
+  manifest: "/manifest.json",
+  other: {
+    "screen-orientation": "landscape",
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -30,12 +45,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <div className="relative min-h-screen">
-          <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-white/90 p-3 rounded-2xl shadow">
-            <NavButton />
-            <AuthClientSlot />
-          </div>
+          <OrientationPrompt />
+          <NavigationWrapper />
           {children}
-          <footer className="fixed bottom-2 left-2 bg-gray-800/80 backdrop-blur-sm text-white py-2 px-3 text-xs z-30 rounded-lg">
+          <footer className="fixed bottom-2 left-2 bg-gradient-to-r from-blue-50/80 to-purple-50/80 backdrop-blur-sm text-gray-800 py-2 px-3 text-xs z-30 rounded-lg border border-blue-100/60 shadow-sm">
             <p>© {new Date().getFullYear()} Joaquin De Rojas Consulting LLC</p>
           </footer>
         </div>

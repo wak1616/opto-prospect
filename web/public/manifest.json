@@ -1,0 +1,17 @@
+{
+  "name": "Opto Prospect",
+  "short_name": "OptoProspect",
+  "description": "Find and Track Optometrists",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

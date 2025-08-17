@@ -24,3 +24,221 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* CSS Orientation Lock - Encourage landscape mode on mobile */
+@media screen and (max-width: 1024px) and (orientation: landscape) {
+  html {
+    transform: none;
+  }
+}
+
+/* Suggest landscape orientation where supported */
+@media screen and (max-width: 1024px) {
+  html {
+    /* Some browsers support this CSS orientation lock */
+    screen-orientation: landscape;
+    /* Fallback: prefer landscape orientation */
+    orientation: landscape;
+  }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 1024px) {
+  /* Improve touch targets */
+  button, input, select {
+    min-height: 44px;
+  }
+  
+  /* Better scrolling for mobile */
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  
+  /* Hide scrollbars on mobile for cleaner look */
+  .overflow-auto::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .overflow-auto::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .overflow-auto::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+  
+  /* Improve button spacing on mobile */
+  .gap-2 {
+    gap: 0.5rem;
+  }
+  
+  /* Better text sizing for mobile */
+  .text-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  
+  /* Prevent overlapping elements on mobile */
+  .absolute {
+    z-index: auto;
+  }
+  
+  /* Ensure proper stacking order */
+  .z-10 {
+    z-index: 10;
+  }
+  
+  .z-20 {
+    z-index: 20;
+  }
+  
+  .z-30 {
+    z-index: 30;
+  }
+  
+  /* Better mobile spacing */
+  .p-3 {
+    padding: 0.75rem;
+  }
+  
+  .gap-3 {
+    gap: 0.75rem;
+  }
+  
+  /* Mobile-friendly shadows */
+  .shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Mobile header specific styles */
+  .mobile-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* Reserve space on the right for the mobile nav ("View Saved" + avatar) */
+    right: 240px; /* gutter for nav */
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  /* Mobile header when collapsed */
+  .mobile-header.collapsed {
+    min-height: auto;
+    padding-bottom: 0.5rem;
+  }
+  
+  .mobile-header.collapsed .p-3 {
+    padding: 0.75rem;
+  }
+  
+  .mobile-header.collapsed .space-y-2 > * + * {
+    margin-top: 0.25rem;
+  }
+  
+  /* Ensure map content doesn't overlap with mobile header */
+  .map-container {
+    margin-top: 0;
+    padding-top: 0;
+  }
+  
+  /* Mobile navigation positioning */
+  .mobile-nav {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+  }
+  
+  /* Mobile results panel */
+  .mobile-results {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 45;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+
+/* Smooth transitions for mobile interactions */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Improve focus states for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Mobile-specific layout improvements */
+@media (max-width: 1024px) {
+  /* Ensure navigation elements don't overlap */
+  .navigation-wrapper {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 50;
+  }
+  
+  /* Better mobile controls positioning */
+  .mobile-controls {
+    margin-top: 5rem;
+  }
+  
+  /* Mobile results panel improvements */
+  .mobile-results {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  
+  /* Mobile header height compensation - increased for compact header */
+  .mobile-header-compensation {
+    padding-top: 8rem;
+  }
+  
+  /* Mobile header compensation when controls are collapsed */
+  .mobile-header-compensation.collapsed {
+    padding-top: 4rem;
+  }
+  
+  .mobile-header.collapsed .p-3 {
+    padding: 0.75rem;
+  }
+  
+  .mobile-header.collapsed .space-y-2 > * + * {
+    margin-top: 0.25rem;
+  }
+  
+  /* Desktop results panel scrolling */
+  .overflow-y-auto::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .overflow-y-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+  }
+  
+  .overflow-y-auto::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}

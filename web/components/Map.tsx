@@ -98,6 +98,13 @@ export default function Map() {
   const [savedPlaces, setSavedPlaces] = useState<Record<string, { met: boolean; lostCause: boolean }>>({});
   const savedPlacesRef = useRef<Record<string, { met: boolean; lostCause: boolean }>>({});
   const [radiusMiles, setRadiusMiles] = useState(DEFAULT_RADIUS_MILES);
+  
+  // Add new state for mobile responsiveness
+  const [isResultsCollapsed, setIsResultsCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileControlsCollapsed, setIsMobileControlsCollapsed] = useState(false);
+  // Mobile-only: collapse the lower filters row (radius + search for) by default
+  const [areLowerFiltersCollapsed, setAreLowerFiltersCollapsed] = useState(true);
   const [searchOptometrist, setSearchOptometrist] = useState(true);
   const [searchEyeCareCenter, setSearchEyeCareCenter] = useState(true);
   const [hasUserNavigatedAway, setHasUserNavigatedAway] = useState(false);
@@ -105,6 +112,7 @@ export default function Map() {
   const [currentUrlPlaceId, setCurrentUrlPlaceId] = useState<string | null>(null);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedControl, setSelectedControl] = useState<'zip' | 'location' | null>(null);
   const isManualMapClick = useRef(false);
   const searchParams = useSearchParams();
 
@@ -153,6 +161,18 @@ export default function Map() {
     });
     return () => unsub();
   }, [userId]);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
 
   // Initialize map
@@ -229,6 +249,9 @@ export default function Map() {
             process.env.NODE_ENV !== 'production' && console.log('Map clicked - no selected place to clear, but marking as manual navigation');
           }
           
+          // Clear selected control when map is clicked
+          setSelectedControl(null);
+          
           // Change cursor to crosshair to indicate selection
           map.setOptions({ draggableCursor: 'crosshair' });
           
@@ -255,6 +278,51 @@ export default function Map() {
       cancelled = true;
     };
   }, [loader]);
+
+  // Automatic location detection and button selection on initial load
+  useEffect(() => {
+    if (!mapInstance.current) return;
+
+    // Only run this once when the map is first loaded
+    const handleInitialLocation = () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setCenter(c);
+            mapInstance.current?.setCenter(c);
+            // Automatically select "Use my location" button and search
+            setSelectedControl('location');
+            // Search nearby places
+            setTimeout(() => {
+              searchNearby(c, undefined, undefined, false);
+            }, 500);
+          },
+          () => {
+            // Location not available, use default zip code 32439
+            setZip('32439');
+            setSelectedControl('zip');
+            // Automatically search using the default zip code
+            setTimeout(() => {
+              geocodeZip();
+            }, 500);
+          }
+        );
+      } else {
+        // Geolocation not supported, use default zip code 32439
+        setZip('32439');
+        setSelectedControl('zip');
+        // Automatically search using the default zip code
+        setTimeout(() => {
+          geocodeZip();
+        }, 500);
+      }
+    };
+
+    // Delay the initial location detection to ensure the map is fully loaded
+    const timer = setTimeout(handleInitialLocation, 1000);
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array since this should only run once on mount
 
   // Perform nearby search for both optometrist and eye doctor
   
@@ -458,7 +526,7 @@ export default function Map() {
         zIndex: 1, // Default z-index for red markers
       });
       const iw = new google.maps.InfoWindow({
-        content: `<div style="font-size:14px;"><b>${p.name}</b><br/>${p.vicinity || p.formatted_address || ''}<br/><button id="save-${p.place_id}" class="text-xs border border-gray-300 rounded px-2 py-1 mt-1 cursor-pointer hover:bg-gray-50 text-gray-900 bg-white">Save</button></div>`,
+        content: `<div style="font-size:14px;"><b>${p.name}</b><br/>${p.vicinity || p.formatted_address || ''}<br/>${savedPlacesRef.current[p.place_id] ? '<span style="color: #059669; font-weight: 500;">Saved ✅</span>' : ''}</div>`,
       });
       marker.addListener('click', () => {
         process.env.NODE_ENV !== 'production' && console.log('Marker clicked:', p.place_id, 'Current selected:', selectedPlaceId);
@@ -487,15 +555,7 @@ export default function Map() {
         iw.open({ map: currentMap, anchor: marker });
         activeInfoWindowRef.current = iw;
         
-        // Add event listener to Save button after InfoWindow is opened
-        setTimeout(() => {
-          const saveButton = document.getElementById(`save-${p.place_id}`);
-          if (saveButton) {
-            saveButton.addEventListener('click', () => {
-              savePlace(p);
-            });
-          }
-        }, 100); // Small delay to ensure DOM is ready
+        // No save button in info windows - users can save from result cards instead
       });
 
       // Add hover functionality to markers
@@ -731,6 +791,7 @@ export default function Map() {
   const geocodeZip = async () => {
     const map = mapInstance.current;
     if (!map || !zip) return;
+    setSelectedControl('zip');
     const geocoder = new google.maps.Geocoder();
     geocoder.geocode({ address: zip }, (results, status) => {
       if (status === 'OK' && results?.[0]?.geometry?.location) {
@@ -745,11 +806,12 @@ export default function Map() {
 
   const handleRecenter = () => {
     if (!navigator.geolocation) return;
+    setSelectedControl('location');
     navigator.geolocation.getCurrentPosition((pos) => {
       const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setCenter(c);
       mapInstance.current?.setCenter(c);
-              searchNearby(c, undefined, undefined, false); // Not a manual click
+      searchNearby(c, undefined, undefined, false); // Not a manual click
     });
   };
 
@@ -836,216 +898,561 @@ export default function Map() {
   };
 
   return (
-    <div className="h-[100dvh] w-full relative">
-      {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex flex-wrap gap-2 bg-white/90 p-3 rounded-2xl shadow">
-        <input
-          value={zip}
-          onChange={(e) => setZip(e.target.value)}
-          placeholder="ZIP code"
-          className="border rounded-lg px-3 py-2 w-36"
-          aria-label="ZIP code"
-        />
-        <button onClick={geocodeZip} className="border rounded-lg px-3 py-2 hover:bg-gray-50">
-          Use zip code
-        </button>
-
-        <button onClick={handleRecenter} className="border rounded-lg px-3 py-2 hover:bg-gray-50">
-          Use my location
-        </button>
-
-        <div className="flex items-center gap-2">
-          <label htmlFor="radius-select" className="text-sm text-gray-600">Search radius:</label>
-          <select
-            id="radius-select"
-            value={radiusMiles}
-            onChange={(e) => setRadiusMiles(Number(e.target.value))}
-            className="border rounded-lg px-2 py-1 text-sm bg-white"
-          >
-            <option value={1}>1 mile</option>
-            <option value={2}>2 miles</option>
-            <option value={3}>3 miles</option>
-            <option value={5}>5 miles</option>
-            <option value={10}>10 miles</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-3 bg-gray-50/80 rounded-lg px-3 py-2">
-          <span className="text-sm text-gray-700 font-medium">Search for:</span>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={searchOptometrist}
-              onChange={(e) => setSearchOptometrist(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Optometrist</span>
-          </label>
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={searchEyeCareCenter}
-              onChange={(e) => setSearchEyeCareCenter(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Eye care center</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Results panel */}
-      <div className="absolute left-4 top-32 z-10 bg-white/95 max-h-[65vh] w-80 overflow-auto rounded-2xl shadow p-3">
-        <div className="font-semibold mb-2">Results ({places.length})</div>
-        {places.length === 0 && <div className="text-sm text-gray-600">No results yet.</div>}
-        <ul className="space-y-2">
-          {places.map((p) => {
-            const saved = savedPlaces[p.place_id];
-            const isSelected = selectedPlaceId === p.place_id;
-            const isHovered = hoveredPlaceId === p.place_id;
-            const isLostCause = saved?.lostCause;
-            const isSavedAndMet = saved?.met && !isLostCause;
-            
-            let className = 'border rounded-lg p-2 transition-all duration-200 ease-in-out ';
-            if (isSelected) {
-              className += 'border-green-500 bg-green-50';
-            } else if (isHovered) {
-              className += 'border-green-400 bg-green-50/50 shadow-lg scale-[1.02] z-10 relative';
-            } else if (isLostCause) {
-              className += 'border-red-500 bg-red-50 opacity-75';
-            } else if (isSavedAndMet) {
-              className += 'bg-gray-100 border-gray-300';
-            }
-            
-            return (
-            <li 
-              key={p.place_id} 
-              className={`${className} cursor-pointer relative ${!isHovered && !isSelected ? 'hover:shadow-lg hover:scale-[1.02] hover:border-green-400 hover:bg-green-50/50 hover:z-10' : ''}`}
-              onMouseEnter={() => {
-                // Only handle card hover if not already hovered from marker
-                if (hoveredPlaceId !== p.place_id) {
-                  // Delay marker highlight to sync with card transition
-                  setTimeout(() => {
-                    const marker = markersRef.current[p.place_id];
-                    if (marker && selectedPlaceId !== p.place_id) {
-                      marker.setIcon({
-                        url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
-                      });
-                      marker.setZIndex(500); // Medium z-index for hovered marker
-                    }
-                  }, 50); // Small delay to start with card animation
-                  setHoveredPlaceId(p.place_id);
-                }
-              }}
-              onMouseLeave={() => {
-                // Only handle card hover leave if this card initiated the hover
-                if (hoveredPlaceId === p.place_id) {
-                  // Delay marker reset to sync with card transition
-                  setTimeout(() => {
-                    const marker = markersRef.current[p.place_id];
-                    if (marker && selectedPlaceId !== p.place_id) {
-                      marker.setIcon({
-                        url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
-                      });
-                      marker.setZIndex(1); // Reset to default z-index
-                    }
-                  }, 150); // Slightly longer delay for smooth exit feel
-                  setHoveredPlaceId(null);
-                }
-              }}
-              onClick={() => {
-                if (p.geometry?.location && mapInstance.current) {
-                  process.env.NODE_ENV !== 'production' && console.log('Card clicked, recentering on:', p.name);
-                  
-                  // Close any open info window
-                  if (activeInfoWindowRef.current) {
-                    activeInfoWindowRef.current.close();
-                  }
-                  
-                  // Reset ALL markers to red first and lower z-index
-                  Object.values(markersRef.current).forEach((m) => {
-                    m.setIcon({
-                      url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
-                    });
-                    m.setZIndex(1); // Default z-index for unselected markers
-                  });
-                  
-                  // Set current selection with higher z-index
-                  setSelectedPlaceId(p.place_id);
-                  const currentMarker = markersRef.current[p.place_id];
-                  if (currentMarker) {
-                    currentMarker.setIcon({
-                      url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
-                    });
-                    currentMarker.setZIndex(1000); // High z-index for selected marker
-                  }
-                  
-                  // Recenter the map on this location
-                  mapInstance.current.panTo(p.geometry.location);
-                }
-              }}
-            >
-              <div className="text-sm font-medium">{p.name}</div>
-              <div className="text-xs text-gray-600">{p.vicinity || p.formatted_address}</div>
-              {renderStarRating(p.rating, p.user_ratings_total)}
-              <div className="mt-2 flex gap-2">
+    <div className={`h-[100dvh] w-full relative ${isMobile ? `mobile-header-compensation ${isMobileControlsCollapsed ? 'collapsed' : ''}` : ''}`}>
+      {/* Mobile Layout Container */}
+      {isMobile && (
+        <div className={`absolute top-0 left-0 z-40 bg-white/95 border-b border-gray-200 shadow-sm mobile-header ${isMobileControlsCollapsed ? 'collapsed' : ''}`}>
+          {/* Mobile Header with Controls */}
+          <div className="px-3 pt-3 pb-1 space-y-1">
+            {/* Toggle Button Row */}
+            <div className="flex items-center justify-start">
+              <div className="flex items-center gap-2">
                 <button
-                  className="text-xs border rounded px-2 py-1"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent card click
-                    if (p.geometry?.location && mapInstance.current) {
-                      process.env.NODE_ENV !== 'production' && console.log('View on map clicked:', p.place_id);
-                      
-                      // Reset ALL markers to red first and lower z-index
-                      Object.values(markersRef.current).forEach((m) => {
-                        m.setIcon({
-                          url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
-                        });
-                        m.setZIndex(1); // Default z-index for unselected markers
-                      });
-                      
-                      // Set current selection with higher z-index
-                      setSelectedPlaceId(p.place_id);
-                      const currentMarker = markersRef.current[p.place_id];
-                      if (currentMarker) {
-                        currentMarker.setIcon({
-                          url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
-                        });
-                        currentMarker.setZIndex(1000); // High z-index for selected marker
-                      }
-                      
-                      mapInstance.current.panTo(p.geometry.location);
-                    }
-                  }}
+                  onClick={() => setIsMobileControlsCollapsed(!isMobileControlsCollapsed)}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                  aria-label={isMobileControlsCollapsed ? 'Expand controls' : 'Collapse controls'}
                 >
-                  View on map
-                </button>
-                <button
-                  className="text-xs border rounded px-2 py-1"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent card click
-                    getDirections(p);
-                  }}
-                >
-                  Directions
-                </button>
-                <button
-                  className="text-xs border rounded px-2 py-1"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent card click
-                    savePlace(p);
-                  }}
-                >
-                  Save
+                  {isMobileControlsCollapsed ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      Show Controls
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                      Hide Controls
+                    </>
+                  )}
                 </button>
               </div>
-            </li>
-            );
-          })}
-        </ul>
+
+            </div>
+
+            {/* Collapsible Controls */}
+            {!isMobileControlsCollapsed && (
+              <>
+                {/* ZIP Code and Location Row - Compact */}
+                <div className="flex flex-col gap-1">
+                  <input
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    placeholder="ZIP code"
+                    className="border rounded-lg px-3 py-1.5 transition-colors duration-200 w-full text-sm"
+                    aria-label="ZIP code"
+                  />
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={geocodeZip} 
+                      className={`border rounded-lg px-3 py-1.5 transition-colors duration-200 cursor-pointer flex-1 text-sm ${
+                        selectedControl === 'zip' 
+                          ? 'bg-purple-200/60 border-purple-300' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      Use zip code
+                    </button>
+
+                    <button 
+                      onClick={handleRecenter} 
+                      className={`border rounded-lg px-3 py-1.5 transition-colors duration-200 cursor-pointer flex-1 text-sm ${
+                        selectedControl === 'location' 
+                          ? 'bg-purple-200/60 border-purple-300' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      Use my location
+                    </button>
+                  </div>
+                  
+                  {/* Hide filters button next to the button row */}
+                  {!areLowerFiltersCollapsed && (
+                    <button
+                      onClick={() => setAreLowerFiltersCollapsed(true)}
+                      className="border rounded-lg px-2 py-1.5 transition-colors duration-200 cursor-pointer text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      aria-label="Hide filters"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Radius and Search Options Row - Ultra Compact (collapsible on mobile) */}
+                {!areLowerFiltersCollapsed && (
+                <div className="flex items-center justify-between gap-2 -mt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="radius-select" className="text-xs text-gray-600 whitespace-nowrap">
+                      Search radius:
+                    </label>
+                    <select
+                      id="radius-select"
+                      value={radiusMiles}
+                      onChange={(e) => setRadiusMiles(Number(e.target.value))}
+                      className="border rounded px-1.5 py-0.5 text-xs bg-white"
+                    >
+                      <option value={1}>1 mile</option>
+                      <option value={2}>2 miles</option>
+                      <option value={3}>3 miles</option>
+                      <option value={5}>5 miles</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-gray-50/80 rounded px-1.5 py-0.5">
+                    <span className="text-xs text-gray-700 font-medium">
+                      Search for:
+                    </span>
+                    <div className="flex gap-1.5">
+                      <label className="flex items-center gap-0.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={searchOptometrist}
+                          onChange={(e) => setSearchOptometrist(e.target.checked)}
+                          className="w-3 h-3 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-700">Optometrist</span>
+                      </label>
+                      <label className="flex items-center gap-0.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={searchEyeCareCenter}
+                          onChange={(e) => setSearchEyeCareCenter(e.target.checked)}
+                          className="w-3 h-3 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-700">Eye care center</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                )}
+
+                {/* Show filters button - mobile: right-aligned to avoid results panel */}
+                {areLowerFiltersCollapsed && (
+                  <div className="flex justify-end pt-1">
+                    <button
+                      onClick={() => setAreLowerFiltersCollapsed(false)}
+                      className="text-xs text-gray-600 hover:text-gray-900 px-2 py-1 rounded"
+                      aria-label="Show filters"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                        Show filters
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Controls */}
+      {!isMobile && (
+        <div className="absolute top-4 left-4 z-30 bg-white/90 rounded-2xl shadow" style={{ maxWidth: 'min(36rem, calc(100vw - 400px))' }}>
+          <div className="p-3 flex flex-wrap gap-2">
+            {/* ZIP Code and Location Row */}
+            <div className="flex gap-2 justify-between items-center">
+              <div className="flex gap-2">
+                <input
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  placeholder="ZIP code"
+                  className="border rounded-lg px-3 py-2 transition-colors duration-200 w-36"
+                  aria-label="ZIP code"
+                />
+                <button 
+                  onClick={geocodeZip} 
+                  className={`border rounded-lg px-3 py-2 transition-colors duration-200 cursor-pointer ${
+                    selectedControl === 'zip' 
+                      ? 'bg-purple-200/60 border-purple-300' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  Use zip code
+                </button>
+
+                <button 
+                  onClick={handleRecenter} 
+                  className={`border rounded-lg px-3 py-2 transition-colors duration-200 cursor-pointer ${
+                    selectedControl === 'location' 
+                      ? 'bg-purple-200/60 border-purple-300' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  Use my location
+                </button>
+              </div>
+              
+              {/* Hide filters button - positioned on the right */}
+              {!areLowerFiltersCollapsed && (
+                <button
+                  onClick={() => setAreLowerFiltersCollapsed(true)}
+                  className="border rounded-lg px-2 py-2 transition-colors duration-200 cursor-pointer text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  aria-label="Hide filters"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Radius and Search Options Row - Desktop (collapsible) */}
+            {!areLowerFiltersCollapsed && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="radius-select" className="text-sm text-gray-600 whitespace-nowrap">
+                    Search radius:
+                  </label>
+                  <select
+                    id="radius-select"
+                    value={radiusMiles}
+                    onChange={(e) => setRadiusMiles(Number(e.target.value))}
+                    className="border rounded-lg px-2 py-1 text-sm bg-white"
+                  >
+                    <option value={1}>1 mile</option>
+                    <option value={2}>2 miles</option>
+                    <option value={3}>3 miles</option>
+                    <option value={5}>5 miles</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 bg-gray-50/80 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-700 font-medium whitespace-nowrap">
+                    Search for:
+                  </span>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={searchOptometrist}
+                        onChange={(e) => setSearchOptometrist(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 whitespace-nowrap">Optometrist</span>
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={searchEyeCareCenter}
+                        onChange={(e) => setSearchEyeCareCenter(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 whitespace-nowrap">Eye care center</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Desktop Show filters toggle */}
+            {areLowerFiltersCollapsed && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setAreLowerFiltersCollapsed(false)}
+                  className="text-xs text-gray-600 hover:text-gray-900 px-2 py-1 rounded"
+                  aria-label="Show filters"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Show filters
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Results panel */}
+      <div className={`absolute z-30 bg-white/95 rounded-2xl shadow transition-all duration-300 ease-in-out ${
+        isMobile 
+          ? isResultsCollapsed 
+            ? 'left-4 top-20 w-12 h-12' 
+            : 'left-4 top-20 w-[calc(100vw-2rem)] max-w-sm max-h-[calc(100vh-6rem)]'
+          : 'left-4 top-32 w-80 max-h-[65vh]'
+      } overflow-hidden`}>
+        {/* Collapse/Expand Button for Mobile */}
+        {isMobile && (
+          <button
+            onClick={() => setIsResultsCollapsed(!isResultsCollapsed)}
+            className={`absolute top-2 right-2 z-20 w-8 h-8 bg-white/90 rounded-full shadow-md flex items-center justify-center transition-all duration-200 ${
+              isResultsCollapsed ? 'hover:bg-gray-100' : 'hover:bg-gray-100'
+            }`}
+            aria-label={isResultsCollapsed ? 'Expand results' : 'Collapse results'}
+          >
+            {isResultsCollapsed ? (
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            )}
+          </button>
+        )}
+
+        {/* Results Content */}
+        <div className={`p-3 ${isResultsCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'} overflow-y-auto ${isMobile ? 'max-h-[calc(100vh-8rem)]' : 'max-h-[calc(65vh-2rem)]'}`}>
+          <div className="font-semibold mb-2 flex items-center justify-between">
+            <span>Results ({places.length})</span>
+            {isMobile && (
+              <span className="text-xs text-gray-500">
+                {isResultsCollapsed ? '' : 'Tap to collapse'}
+              </span>
+            )}
+          </div>
+          
+          {/* Mobile Scroll Hint */}
+          {isMobile && places.length > 3 && (
+            <div className="text-xs text-gray-500 text-center mb-2 pb-2 border-b border-gray-200">
+              📱 Scroll down to see more results
+            </div>
+          )}
+          
+          {/* Desktop Scroll Hint */}
+          {!isMobile && places.length > 8 && (
+            <div className="text-xs text-gray-500 text-center mb-2 pb-2 border-b border-gray-200">
+              🖱️ Scroll down to see more results
+            </div>
+          )}
+          
+          {/* Mobile Results Count Badge when collapsed */}
+          {isMobile && isResultsCollapsed && places.length > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                {places.length > 99 ? '99+' : places.length}
+              </div>
+            </div>
+          )}
+          
+          {/* Mobile Results Hint */}
+          {isMobile && isResultsCollapsed && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-xs text-gray-400 text-center">
+                {places.length > 0 ? 'Tap to view' : 'No results'}
+              </div>
+            </div>
+          )}
+          
+          {places.length === 0 && <div className="text-sm text-gray-600">No results yet.</div>}
+          
+          <ul className="space-y-2">
+            {places.map((p) => {
+              const saved = savedPlaces[p.place_id];
+              const isSelected = selectedPlaceId === p.place_id;
+              const isHovered = hoveredPlaceId === p.place_id;
+              const isLostCause = saved?.lostCause;
+              const isSavedAndMet = saved?.met && !isLostCause;
+              
+              let className = 'border rounded-lg p-2 transition-all duration-200 ease-in-out ';
+              if (isSelected) {
+                className += 'border-green-500 bg-green-50';
+              } else if (isHovered) {
+                className += 'border-green-400 bg-green-50/50 shadow-lg scale-[1.02] z-20 relative';
+              } else if (isLostCause) {
+                className += 'border-red-500 bg-red-50 opacity-75';
+              } else if (isSavedAndMet) {
+                className += 'bg-gray-100 border-gray-300';
+              }
+              
+              return (
+              <li 
+                key={p.place_id} 
+                className={`${className} cursor-pointer relative ${!isHovered && !isSelected ? 'hover:shadow-xl hover:scale-[1.02] hover:border-green-400 hover:bg-green-50/50 hover:z-[100]' : ''}`}
+                onMouseEnter={() => {
+                  // Only handle card hover if not already hovered from marker
+                  if (hoveredPlaceId !== p.place_id) {
+                    // Delay marker highlight to sync with card transition
+                    setTimeout(() => {
+                      const marker = markersRef.current[p.place_id];
+                      if (marker && selectedPlaceId !== p.place_id) {
+                        marker.setIcon({
+                          url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
+                        });
+                        marker.setZIndex(500); // Medium z-index for hovered marker
+                      }
+                    }, 50); // Small delay to start with card animation
+                    setHoveredPlaceId(p.place_id);
+                  }
+                }}
+                onMouseLeave={() => {
+                  // Only handle card hover leave if this card initiated the hover
+                  if (hoveredPlaceId === p.place_id) {
+                    // Delay marker reset to sync with card transition
+                    setTimeout(() => {
+                      const marker = markersRef.current[p.place_id];
+                      if (marker && selectedPlaceId !== p.place_id) {
+                        marker.setIcon({
+                          url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+                        });
+                        marker.setZIndex(1); // Reset to default z-index
+                      }
+                    }, 150); // Slightly longer delay for smooth exit feel
+                    setHoveredPlaceId(null);
+                  }
+                }}
+                onClick={() => {
+                  if (p.geometry?.location && mapInstance.current) {
+                    process.env.NODE_ENV !== 'production' && console.log('Card clicked, recentering on:', p.name);
+                    
+                    // Close any open info window
+                    if (activeInfoWindowRef.current) {
+                      activeInfoWindowRef.current.close();
+                    }
+                    
+                    // Reset ALL markers to red first and lower z-index
+                    Object.values(markersRef.current).forEach((m) => {
+                      m.setIcon({
+                        url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+                      });
+                      m.setZIndex(1); // Default z-index for unselected markers
+                    });
+                    
+                    // Set current selection with higher z-index
+                    setSelectedPlaceId(p.place_id);
+                    const currentMarker = markersRef.current[p.place_id];
+                    if (currentMarker) {
+                      currentMarker.setIcon({
+                        url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
+                      });
+                      currentMarker.setZIndex(1000); // High z-index for selected marker
+                    }
+                    
+                    // Recenter the map on this location
+                    mapInstance.current.panTo(p.geometry.location);
+                  }
+                }}
+              >
+                <div className="text-sm font-medium">{p.name}</div>
+                <div className="text-xs text-gray-600">{p.vicinity || p.formatted_address}</div>
+                {renderStarRating(p.rating, p.user_ratings_total)}
+                <div className={`mt-2 flex gap-2 ${isMobile ? 'flex-wrap' : ''}`}>
+                  <button
+                    className={`text-xs border rounded px-2 py-1 transition-colors duration-200 hover:bg-gray-50 ${
+                      isMobile ? 'flex-1 text-center' : ''
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent card click
+                      if (p.geometry?.location && mapInstance.current) {
+                        process.env.NODE_ENV !== 'production' && console.log('View on map clicked:', p.place_id);
+                        
+                        // Reset ALL markers to red first and lower z-index
+                        Object.values(markersRef.current).forEach((m) => {
+                          m.setIcon({
+                            url: `https://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+                          });
+                          m.setZIndex(1); // Default z-index for unselected markers
+                        });
+                        
+                        // Set current selection with higher z-index
+                        setSelectedPlaceId(p.place_id);
+                        const currentMarker = markersRef.current[p.place_id];
+                        if (currentMarker) {
+                          currentMarker.setIcon({
+                            url: `https://maps.google.com/mapfiles/ms/icons/green-dot.png`,
+                          });
+                          currentMarker.setZIndex(1000); // High z-index for selected marker
+                        }
+                        
+                        mapInstance.current.panTo(p.geometry.location);
+                      }
+                    }}
+                  >
+                    {isMobile ? 'Map' : 'View on map'}
+                  </button>
+                  <button
+                    className={`text-xs border rounded px-2 py-1 transition-colors duration-200 hover:bg-gray-50 ${
+                      isMobile ? 'flex-1 text-center' : ''
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent card click
+                      getDirections(p);
+                    }}
+                  >
+                    {isMobile ? 'Route' : 'Directions'}
+                  </button>
+                  <button
+                    className={`text-xs border rounded px-2 py-1 transition-colors duration-200 ${
+                      isMobile ? 'flex-1 text-center' : ''
+                    } ${
+                      saved 
+                        ? 'bg-green-100 text-green-700 border-green-300 cursor-default' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                    onClick={(e) => {
+                      if (!saved) {
+                        e.stopPropagation(); // Prevent card click
+                        savePlace(p);
+                      }
+                    }}
+                    disabled={!!saved}
+                  >
+                    {saved ? 'Saved ✅' : 'Save'}
+                  </button>
+                </div>
+              </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
 
       {/* Map canvas */}
       <div ref={mapRef} className="h-full w-full rounded-none" />
+      
+      {/* Mobile Floating Action Button for Quick Access */}
+      {isMobile && (
+        <div className="fixed bottom-4 right-4 z-30">
+          <div className="flex flex-col gap-2">
+            {/* Quick Search Button */}
+            {places.length === 0 && (
+              <button
+                onClick={() => {
+                  if (center) {
+                    searchNearby(center, undefined, undefined, false);
+                  }
+                }}
+                className="w-12 h-12 bg-blue-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-600 transition-colors duration-200"
+                aria-label="Quick search"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            )}
+            
+            {/* Quick Results Toggle */}
+            {places.length > 0 && (
+              <button
+                onClick={() => setIsResultsCollapsed(!isResultsCollapsed)}
+                className="w-12 h-12 bg-green-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-green-600 transition-colors duration-200"
+                aria-label={isResultsCollapsed ? 'Show results' : 'Hide results'}
+              >
+                {isResultsCollapsed ? (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Toast notification */}
       {toastMessage && (
